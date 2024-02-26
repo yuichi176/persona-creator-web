@@ -1,7 +1,5 @@
+import { TopPageContainer } from '@/components/TopPageContainer'
+
 export default function Home() {
-  return (
-    <main>
-      <p>Persona Creator</p>
-    </main>
-  )
+  return <TopPageContainer />
 }
