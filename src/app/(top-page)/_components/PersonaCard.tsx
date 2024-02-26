@@ -1,5 +1,5 @@
 import { Card } from '@/components/ui/card'
-import { PersonaData } from '@/components/TopPageContainer'
+import { PersonaData } from '@/app/(top-page)/_components/TopPageContainer'
 
 interface PersonaCardProps {
   personaData: PersonaData

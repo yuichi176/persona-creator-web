@@ -1,5 +1,5 @@
-import { PersonaCard } from '@/components/PersonaCard'
-import { CreatePersonaDialog } from '@/components/CreatePersonaDialog'
+import { PersonaCard } from '@/app/(top-page)/_components/PersonaCard'
+import { CreatePersonaDialog } from './CreatePersonaDialog'
 
 const personaData: PersonaData = {
   name: '山田大輝',
