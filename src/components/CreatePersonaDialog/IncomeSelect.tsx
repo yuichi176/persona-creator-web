@@ -7,8 +7,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-type IncomeSelectProps = {}
-
 export const IncomeSelect = () => {
   return (
     <Select defaultValue="指定なし">
