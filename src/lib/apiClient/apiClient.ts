@@ -1,21 +1,19 @@
-import { ZodError } from 'zod'
-
 export const apiClient = {
   async get<T>(
     url: string,
-    responseParser: (response: Response) => T | Promise<T>,
+    responseTypeValidator: (responseData: object) => T,
     options?: RequestInit,
-  ): Promise<HttpResponse<T>> {
-    return request(url, responseParser, options)
+  ): Promise<ApiResponse<T>> {
+    return request(url, responseTypeValidator, options)
   },
 
   async post<T>(
     url: string,
-    responseParser: (response: Response) => T | Promise<T>,
+    responseTypeValidator: (responseData: object) => T,
     body: object,
     options?: RequestInit,
-  ): Promise<HttpResponse<T>> {
-    return request(url, responseParser, {
+  ): Promise<ApiResponse<T>> {
+    return request(url, responseTypeValidator, {
       method: 'POST',
       ...(body === null ? {} : { body: JSON.stringify(body) }),
       ...options,
@@ -25,9 +23,9 @@ export const apiClient = {
 
 const request = async <T>(
   url: string,
-  responseParser: (response: Response) => T | Promise<T>,
+  responseTypeValidator: (responseData: object) => T,
   options?: RequestInit,
-): Promise<HttpResponse<T>> => {
+): Promise<ApiResponse<T>> => {
   const mergedOptions = {
     ...options,
     headers: {
@@ -41,52 +39,69 @@ const request = async <T>(
     if (!res.ok) {
       const errorResponse = (await res.json()) as ErrorResponse | undefined
       if (errorResponse === undefined) {
-        throw new ApiError(
-          {
-            error: {
-              reason: 'RequestNotReachedServer',
-              message: `Request did not reach the server. Status code: ${res.status} `,
-            },
+        return {
+          error: {
+            reason: 'RequestNotReachedServer',
+            message: `Request did not reach the server. Status code: ${res.status} `,
+            status: res.status,
+            url: res.url,
           },
-          res.status,
-          res.url,
-        )
+          data: undefined,
+        }
       } else {
-        throw new ApiError(errorResponse, res.status, res.url)
+        return {
+          error: {
+            reason: errorResponse.error.reason,
+            message: `Request failed with status: ${res.status} `,
+            status: res.status,
+            url: res.url,
+          },
+          data: undefined,
+        }
       }
     }
-    const data = await responseParser(res)
-    return { error: undefined, data: data }
+    const data = await res.json()
+    return validateResponseData(data, responseTypeValidator)
   } catch (error) {
-    if (error instanceof ApiError) {
-      return { error: error, data: undefined }
-    } else if (error instanceof ZodError) {
+    if (error instanceof Error) {
       return {
-        error: new ApiError({
-          error: {
-            reason: 'ValidationError',
-            message: error.message,
-          },
-        }),
+        error: {
+          reason: 'UnexpectedError',
+          message: error.message,
+        },
         data: undefined,
       }
     } else {
-      return {
-        error: new ApiError({
-          error: {
-            reason: 'UnexpectedError',
-            message: `An unexpected error occurred: ${error}`,
-          },
-        }),
-        data: undefined,
-      }
+      throw error
     }
   }
 }
 
-export type HttpResponse<T> =
+const validateResponseData = <T>(data: object, validator: (data: object) => T): ApiResponse<T> => {
+  try {
+    const validatedData = validator(data)
+    return {
+      error: undefined,
+      data: validatedData,
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      return {
+        error: {
+          reason: 'ValidationError',
+          message: error.message,
+        },
+        data: undefined,
+      }
+    } else {
+      throw error
+    }
+  }
+}
+
+export type ApiResponse<T> =
   | {
-      error: Error
+      error: ApiError
       data: undefined
     }
   | {
@@ -97,18 +112,12 @@ export type HttpResponse<T> =
 type ErrorResponse = {
   error: {
     reason: string
-    message: string
   }
 }
 
-class ApiError extends Error {
+type ApiError = {
+  reason: string
+  message: string
   status?: number
   url?: string
-  errorResponse: ErrorResponse
-  constructor(errorResponse: ErrorResponse, status?: number, url?: string) {
-    super('ApiError')
-    this.status = status
-    this.url = url
-    this.errorResponse = errorResponse
-  }
 }
